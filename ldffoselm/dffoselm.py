@@ -69,6 +69,7 @@ class DffOsElm(BaseEstimator):
         self : object
             Returns self.
         """
+
         self.__first_phase(X[0:self.slide_window], y[0:self.slide_window])
         X, y = check_X_y(X, y)
 
@@ -86,17 +87,22 @@ class DffOsElm(BaseEstimator):
         for number_hidden_neurons_layer in range(self.min_hidden_neurons_layer, max_hidden_neurons_layer + 1):
             list_tests = []
             for train_index, test_index in kf.split(X, y):
-                elm = self.__elm_fit(X[train_index], y[train_index], number_hidden_neurons_layer)
-                y_pred = self.__elm_predict(X[test_index], elm)
-                list_tests.append(mean_squared_error(y[test_index], y_pred))
+                data_scale_train = self.__scaleZMean1Var(X[train_index], y[train_index])
+                data_scale_test = self.__scale(X[test_index], data_scale_train['x_mean'], data_scale_train['x_std'])
+
+                elm = self.__elm_fit(data_scale_train['x_scale'], data_scale_train['y_scale'], number_hidden_neurons_layer)
+                y_pred = self.__elm_predict(data_scale_test, elm)
+                y_pred_rescale = self.__rescale(y_pred, data_scale_train['y_mean'], data_scale_train['y_std'])
+
+                list_tests.append(mean_squared_error(y[test_index], y_pred_rescale))
 
             mean_mse.append(np.mean(list_tests))
 
         data_scale = self.__scaleZMean1Var(X, y)
-        self.__x_mean = np.power(data_scale['x_mean'], 2)
-        self.__x_std = np.power(data_scale['x_std'], 2)
-        self.__y_mean = np.power(data_scale['y_mean'], 2)
-        self.__y_std = np.power(data_scale['y_std'], 2)
+        self.__x_mean = data_scale['x_mean']
+        self.__x_std = data_scale['x_std']
+        self.__y_mean = data_scale['y_mean']
+        self.__y_std = data_scale['y_std']
 
         self.__var_x = np.power(data_scale['x_std'], 2)
         self.__var_y = np.power(data_scale['y_std'], 2)
@@ -110,7 +116,7 @@ class DffOsElm(BaseEstimator):
         self._elm = self.__elm_fit(X_scaled, y_scaled, number_hidden_neurons_layer)
 
     def __elm_fit(self, X, y, number_hidden_neurons_layer):
-        bias = self.__rng.rand(1, number_hidden_neurons_layer) * 2 - 1 # FIXME: Rever esses random
+        bias = self.__rng.rand(1, number_hidden_neurons_layer) * 2 - 1
         input_weight = self.__rng.rand(number_hidden_neurons_layer, X.shape[1]) * 2 - 1
 
         elm = ELM(number_hidden_neurons_layer, input_weight, bias)
@@ -119,8 +125,8 @@ class DffOsElm(BaseEstimator):
             H = self.__sig_activation_function(X, elm)
 
         elm.covariance_matrix = scipy.linalg.pinv(np.matmul(H.transpose(), H))
-        elm.beta = np.matmul(np.linalg.pinv(H),  y)
 
+        elm.beta = np.matmul(np.linalg.pinv(H),  y)
         return elm
 
     def predict(self, X, y=None):
@@ -223,8 +229,6 @@ class DffOsElm(BaseEstimator):
         return (X, y)
 
     def __scale(self, input, mean, std):
-        a = np.subtract(input, mean)
-        b = np.divide(np.subtract(input, mean), std)
         return np.divide(np.subtract(input, mean), std)
 
     def __rescale(self, input, mean, std):

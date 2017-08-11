@@ -16,13 +16,15 @@ data = loadmat('../dSetDebutanizerOff.mat', matlab_compatible=True)
 X = data['input']
 y = data['output']
 
-estimator = DffOsElm()
+estimator = DffOsElm(random_state=10)
 estimator.fit(X, y)
 
-y_pred = []
-for i in range(estimator.get_params()['slide_window'] + 1, X.shape[0]):
-    y_pred.append(estimator.predict(X[i], y[i])[0])
 
-plt.plot(y_pred)
-plt.plot(y)
+y_pred = []
+#X.shape[0]
+for i in range(estimator.get_params()['slide_window'] + 1, len(y)):
+    y_pred.append(estimator.predict(X[i], y[i][0])[0])
+
+plt.plot(y_pred, linewidth=0.5)
+plt.plot(y, linewidth=0.5)
 plt.show()
